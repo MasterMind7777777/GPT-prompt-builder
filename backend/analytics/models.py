@@ -1,24 +1,9 @@
 from django.db import models
-from django.conf import settings
 from prompt_templates.models import Template, TemplatePart
-from metadata.models import Prompt
+from metadata.models import Outcome
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
-
-
-class Outcome(models.Model):
-    """
-    Represents the results obtained from executing prompts.
-    """
-
-    prompt = models.ForeignKey(Prompt, on_delete=models.CASCADE)
-    content = models.TextField()
-    generated_at = models.DateTimeField(auto_now_add=True)
-    tool_used = models.CharField(max_length=255)
-
-    def __str__(self):
-        return f"Outcome of Prompt: {self.prompt.id}, Generated at: {self.generated_at}"
 
 
 class OutcomeMetric(models.Model):
@@ -53,9 +38,7 @@ class Ranking(models.Model):
     part = models.ForeignKey(
         TemplatePart, on_delete=models.CASCADE, null=True, blank=True
     )
-    user = models.ForeignKey(
-        User, on_delete=models.CASCADE
-    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     score = models.IntegerField()
     comments = models.TextField(null=True, blank=True)
     ranked_at = models.DateTimeField(auto_now_add=True)

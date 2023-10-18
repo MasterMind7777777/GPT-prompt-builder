@@ -1,26 +1,9 @@
 from django.db import models
-from django.contrib.postgres.fields import JSONField
+from django.db.models import JSONField
 from prompt_templates.models import Template, TemplatePart
-from analytics.models import Outcome
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
-
-
-class Tag(models.Model):
-    """
-    Represents a tag that can be associated with templates, template parts, or outcomes.
-    Helps in categorizing and searching templates effectively.
-    """
-
-    name = models.CharField(max_length=255, unique=True)
-    templates = models.ManyToManyField(Template, blank=True)
-    template_parts = models.ManyToManyField(TemplatePart, blank=True)
-    # Assuming an Outcome model is defined
-    outcomes = models.ManyToManyField(Outcome, blank=True)
-
-    def __str__(self):
-        return self.name
 
 
 class Prompt(models.Model):
@@ -38,3 +21,33 @@ class Prompt(models.Model):
 
     class Meta:
         ordering = ["-date_generated"]
+
+
+class Outcome(models.Model):
+    """
+    Represents the results obtained from executing prompts.
+    """
+
+    prompt = models.ForeignKey(Prompt, on_delete=models.CASCADE)
+    content = models.TextField()
+    generated_at = models.DateTimeField(auto_now_add=True)
+    tool_used = models.CharField(max_length=255)
+
+    def __str__(self):
+        return f"Outcome of Prompt: {self.prompt.id}, Generated at: {self.generated_at}"
+
+
+class Tag(models.Model):
+    """
+    Represents a tag that can be associated with templates, template parts, or outcomes.
+    Helps in categorizing and searching templates effectively.
+    """
+
+    name = models.CharField(max_length=255, unique=True)
+    templates = models.ManyToManyField(Template, blank=True)
+    template_parts = models.ManyToManyField(TemplatePart, blank=True)
+    # Assuming an Outcome model is defined
+    outcomes = models.ManyToManyField(Outcome, blank=True)
+
+    def __str__(self):
+        return self.name

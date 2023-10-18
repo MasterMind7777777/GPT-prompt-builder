@@ -1,5 +1,4 @@
 from django.db import models
-from django.conf import settings
 from prompt_templates.models import Template, TemplatePart
 from django.contrib.auth import get_user_model
 
@@ -44,9 +43,7 @@ class CommentFeedback(models.Model):
     part = models.ForeignKey(
         TemplatePart, on_delete=models.CASCADE, null=True, blank=True
     )
-    user = models.ForeignKey(
-        User, on_delete=models.CASCADE
-    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField()
     parent_comment = models.ForeignKey(
         "self", on_delete=models.SET_NULL, null=True, blank=True
