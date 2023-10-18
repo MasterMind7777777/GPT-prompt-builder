@@ -1,0 +1,22 @@
+{
+  "venvPath": "./venv",
+  "venv": "venv",
+  "include": [
+    "./analytics/**/*.py",
+    "./community/**/*.py",
+    "./metadata/**/*.py",
+    "./prompt_templates/**/*.py",
+    "./manage.py"
+  ],
+  "pythonPath": "./venv/bin/python",
+  "typeCheckingMode": "basic",
+  "pluginPath": ".",
+  "plugins": [
+    {
+      "pluginId": "django",
+      "pluginName": "Django",
+      "enabled": true
+    }
+  ]
+}
+
