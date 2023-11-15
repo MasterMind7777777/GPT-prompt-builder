@@ -1,196 +1,172 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import ReactQuill, { Quill } from "react-quill";
+import "react-quill/dist/quill.snow.css";
+import { useDrop } from "react-dnd";
 
 const AdvancedTextInput = () => {
-  const canvasRef = useRef(null);
-  const [textMatrix, setTextMatrix] = useState([[""]]);
-  const [charPositions, setCharPositions] = useState({});
-  const [cursorPosition, setCursorPosition] = useState({ line: 0, char: 0 });
-  const [selectionStart, setSelectionStart] = useState(null);
-  const [selectionEnd, setSelectionEnd] = useState(null);
-  const [selection, setSelection] = useState(null);
-  const [isMouseDown, setIsMouseDown] = useState(false);
-
-  const fontSize = 20; // Control font size here
-
-  const renderCanvas = () => {
-    const canvas = canvasRef.current;
-    const context = canvas.getContext("2d");
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.font = `${fontSize}px Arial`; // Set font here
-
-    let yPos = fontSize;
-    let newCharPositions = {};
-
-    textMatrix.forEach((line, lineIndex) => {
-      let xPos = 10;
-      line.forEach((char, charIndex) => {
-        // Highlight selection if within range
-        if (isCharSelected(lineIndex, charIndex)) {
-          const charWidth = context.measureText(char).width;
-          context.fillStyle = "yellow";
-          context.fillRect(xPos, yPos - 18, charWidth, 18);
-          context.fillStyle = "black";
-        }
-
-        context.fillText(char, xPos, yPos);
-        newCharPositions[`${lineIndex}-${charIndex}`] = {
-          x: xPos,
-          y: yPos,
-          width: context.measureText(char).width,
-        };
-        xPos += context.measureText(char).width;
-        // Draw cursor
-        if (
-          lineIndex === cursorPosition.line &&
-          charIndex === cursorPosition.char
-        ) {
-          context.fillStyle = "black"; // Cursor color
-          context.fillRect(xPos, yPos - fontSize, 2, fontSize); // Cursor dimensions
-        }
-      });
-
-      yPos += 20; // Line height
-    });
-
-    setCharPositions(newCharPositions);
-    console.log(charPositions);
-  };
-
-  useEffect(renderCanvas, [textMatrix, selectionStart, selectionEnd, cursorPosition]);
-
-  const isCharSelected = (lineIndex, charIndex) => {
-    if (!selectionStart || !selectionEnd) return false;
-    if (selectionStart.line > lineIndex || selectionEnd.line < lineIndex)
-      return false;
-    if (selectionStart.line === lineIndex && selectionStart.char > charIndex)
-      return false;
-    if (selectionEnd.line === lineIndex && selectionEnd.char < charIndex)
-      return false;
-    return true;
-  };
+  const [text, setText] = useState("");
+  const quillRef = useRef(null);
 
   useEffect(() => {
-    const handleKeyPress = (e) => {
-      const newMatrix = [...textMatrix];
-      let { line, char } = cursorPosition;
-
-      if (e.key === "Enter") {
-        newMatrix.splice(line + 1, 0, []);
-        char = 0;
-        line += 1;
-      } else if (e.key === "ArrowLeft") {
-        char = char > 0 ? char - 1 : line > 0 ? newMatrix[line - 1].length : 0;
-        line = char === 0 && line > 0 ? line - 1 : line;
-      } else if (e.key === "ArrowRight") {
-        char =
-          char < newMatrix[line].length
-            ? char + 1
-            : line < newMatrix.length - 1
-            ? 0
-            : char;
-        line = char === 0 && line < newMatrix.length - 1 ? line + 1 : line;
-      } else if (e.key === "ArrowUp") {
-        line = Math.max(line - 1, 0);
-        char = Math.min(char, newMatrix[line].length);
-      } else if (e.key === "ArrowDown") {
-        line = Math.min(line + 1, newMatrix.length - 1);
-        char = Math.min(char, newMatrix[line].length);
-      } else if (e.key === "Backspace") {
-        if (char > 0 || line > 0) {
-          if (char > 0) {
-            newMatrix[line].splice(char - 1, 1);
-            char -= 1;
-          } else {
-            line -= 1;
-            char = newMatrix[line].length;
-            newMatrix[line].push(...newMatrix[line + 1]);
-            newMatrix.splice(line + 1, 1);
-          }
-        }
-      } else if (e.key.length === 1) {
-        newMatrix[line].splice(char, 0, e.key);
-        char += 1;
-      }
-
-      setTextMatrix(newMatrix);
-      setCursorPosition({ line, char });
+    const logMousePosition = (e) => {
+      console.log(`Mouse position: X: ${e.clientX}, Y: ${e.clientY}`);
     };
 
-    window.addEventListener("keydown", handleKeyPress);
-    return () => {
-      window.removeEventListener("keydown", handleKeyPress);
-    };
-  }, [textMatrix, cursorPosition]);
+    // Add event listener to log the mouse position when the mouse moves
+    document.addEventListener("dragover", logMousePosition);
 
-  // Add mouse event listeners
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    canvas.addEventListener("mousedown", handleMouseDown);
-    canvas.addEventListener("mousemove", handleMouseMove);
-    canvas.addEventListener("mouseup", handleMouseUp);
+    // Remove event listener on cleanup
+    return () => document.removeEventListener("dragover", logMousePosition);
+  }, []);
 
-    return () => {
-      canvas.removeEventListener("mousedown", handleMouseDown);
-      canvas.removeEventListener("mousemove", handleMouseMove);
-      canvas.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [selectionStart, selectionEnd]);
-
-  const findClosestCharacter = (x, y) => {
-    let closestLine = null;
-    let closestChar = null;
-    let minDistance = Infinity;
-    console.log(charPositions);
-
-    Object.entries(charPositions).forEach(([key, pos]) => {
-      const distance = Math.sqrt(
-        Math.pow(x - pos.x, 2) + Math.pow(y - pos.y, 2),
-      );
-      if (distance < minDistance) {
-        minDistance = distance;
-        const [line, char] = key.split("-").map(Number);
-        closestLine = line;
-        closestChar = char;
-      }
-    });
-
-    return { line: closestLine, char: closestChar };
-  };
-
-  const handleMouseDown = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const { line, char } = findClosestCharacter(x, y);
-    setSelectionStart({ line, char });
-    setSelectionEnd(null);
-    setIsMouseDown(true);
-  };
-
-  const handleMouseMove = (e) => {
-    if (isMouseDown && selectionStart) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      const { line, char } = findClosestCharacter(x, y);
-      setSelectionEnd({ line, char });
+  class PlaceholderBlot extends Quill.import("blots/embed") {
+    static create(value) {
+      let node = super.create();
+      node.setAttribute("data-placeholder", value);
+      node.setAttribute("contenteditable", "false"); // Prevent editing
+      node.innerText = value; // Use textContent or innerText for security
+      node.style.display = "inline-block"; // Ensure it doesn't take the full width
+      node.style.borderRadius = "15px"; // Rounded borders for bubble effect
+      node.style.padding = "2px 8px"; // Padding inside the bubble
+      node.style.margin = "0 2px"; // Spacing between the bubble and other text
+      node.style.backgroundColor = "#e0e0e0"; // Background color for the bubble
+      node.style.border = "1px solid #bdbdbd"; // Border to look like a bubble
+      return node;
     }
+
+    static value(node) {
+      return node.getAttribute("data-placeholder");
+    }
+  }
+
+  PlaceholderBlot.blotName = "placeholder";
+  PlaceholderBlot.tagName = "span"; // Use 'span' to make it inline
+
+  Quill.register(PlaceholderBlot);
+
+  const calculateDropIndex = (mousePosition) => {
+    const editor = quillRef.current.getEditor();
+    const editorBounds = editor.container.getBoundingClientRect();
+    const editorLength = editor.getLength();
+    let closestIndex = 0;
+    let smallestDistance = Infinity;
+
+    for (let i = 0; i < editorLength; i++) {
+      const bounds = editor.getBounds(i);
+      const charCenterX = bounds.left + bounds.width / 2;
+      const charCenterY = bounds.top + bounds.height / 2;
+      const distance = Math.sqrt(
+        (mousePosition.x - charCenterX) ** 2 +
+          (mousePosition.y - charCenterY) ** 2,
+      );
+
+      if (distance < smallestDistance) {
+        smallestDistance = distance;
+        closestIndex = i;
+      }
+    }
+
+    return closestIndex;
   };
 
-  const handleMouseUp = (e) => {
-    setIsMouseDown(false);
-    setSelection({ start: selectionStart, end: selectionEnd });
+  // useEffect for dragover to show visual indicator
+  useEffect(() => {
+    const handleDragOver = (event) => {
+      event.preventDefault(); // Prevent default to allow drop
+      if (!quillRef.current) {
+        return;
+      }
+
+      const quill = quillRef.current.getEditor();
+      const editorBounds = quill.container.getBoundingClientRect();
+      const mousePosition = {
+        x: event.clientX - editorBounds.left,
+        y: event.clientY - editorBounds.top,
+      };
+
+      const closestIndex = calculateDropIndex(mousePosition);
+
+      quill.setSelection(closestIndex, 0, "silent");
+
+      quill.scrollIntoView(); // Optional: Scroll the indicator into view if it's not visible
+    };
+
+    document.addEventListener("dragover", handleDragOver);
+    return () => document.removeEventListener("dragover", handleDragOver);
+  }, [calculateDropIndex]);
+
+  // Define the handleDrop function
+  const handleDrop = useCallback(
+    (item, monitor) => {
+      if (quillRef.current) {
+        const quill = quillRef.current.getEditor();
+
+        // Get the client offset from the monitor
+        const clientOffset = monitor.getClientOffset();
+        const editorBounds = quill.container.getBoundingClientRect();
+
+        if (clientOffset) {
+          const mousePosition = {
+            x: clientOffset.x - editorBounds.left,
+            y: clientOffset.y - editorBounds.top,
+          };
+
+          const closestIndex = calculateDropIndex(mousePosition);
+
+          // Set the selection to the index we've found
+          quill.setSelection(closestIndex, 0, "silent");
+
+          // Perform the insertEmbed at the new calculated position
+          quill.insertEmbed(
+            closestIndex,
+            "placeholder",
+            item.name,
+            Quill.sources.USER,
+          );
+
+          // Update the selection to just after the inserted text
+          quill.setSelection(
+            closestIndex + item.name.length,
+            0,
+            Quill.sources.SILENT,
+          );
+        }
+      }
+    },
+    [quillRef],
+  );
+
+  const [, drop] = useDrop(() => ({
+    accept: "PLACEHOLDER",
+    drop: handleDrop,
+  }));
+
+  // Callback for text change in the editor
+  const handleChange = (content, delta, source, editor) => {
+    setText(editor.getHTML()); // or content for just the HTML content
   };
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={800}
-      height={600}
-      style={{ border: "1px solid black" }}
-    ></canvas>
+    <div
+      ref={drop}
+      style={{
+        border: "1px solid black",
+        width: "100%",
+        height: "95%",
+        padding: "10px",
+      }}
+    >
+      <ReactQuill
+        value={text}
+        ref={quillRef}
+        onChange={handleChange}
+        style={{
+          height: "95%",
+          width: "100%",
+        }}
+        modules={AdvancedTextInput.modules}
+      />
+    </div>
   );
 };
 
