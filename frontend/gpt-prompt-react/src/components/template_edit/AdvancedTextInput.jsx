@@ -7,18 +7,6 @@ const AdvancedTextInput = () => {
   const [text, setText] = useState("");
   const quillRef = useRef(null);
 
-  useEffect(() => {
-    const logMousePosition = (e) => {
-      console.log(`Mouse position: X: ${e.clientX}, Y: ${e.clientY}`);
-    };
-
-    // Add event listener to log the mouse position when the mouse moves
-    document.addEventListener("dragover", logMousePosition);
-
-    // Remove event listener on cleanup
-    return () => document.removeEventListener("dragover", logMousePosition);
-  }, []);
-
   class PlaceholderBlot extends Quill.import("blots/embed") {
     static create(value) {
       let node = super.create();
@@ -31,18 +19,37 @@ const AdvancedTextInput = () => {
       node.style.margin = "0 2px"; // Spacing between the bubble and other text
       node.style.backgroundColor = "#e0e0e0"; // Background color for the bubble
       node.style.border = "1px solid #bdbdbd"; // Border to look like a bubble
+      node.addEventListener("dragstart", this.handleDragStart);
+      node.addEventListener("drop", this.intermediateDropHandler);
+
+      // Make the node draggable
+      node.setAttribute("draggable", "true");
       return node;
     }
 
     static value(node) {
       return node.getAttribute("data-placeholder");
     }
+
+    static handleDragEnter(e) {
+      e.preventDefault();
+    }
+
+    static handleDragStart(e) {
+      e.dataTransfer.setData(
+        "text/plain",
+        e.target.getAttribute("data-placeholder"),
+      );
+      // Store the id of the element in the drag event
+      e.dataTransfer.setData("text/id", "from_editor");
+      e.dataTransfer.effectAllowed = "move";
+    }
   }
 
   PlaceholderBlot.blotName = "placeholder";
   PlaceholderBlot.tagName = "span"; // Use 'span' to make it inline
 
-  Quill.register(PlaceholderBlot);
+  Quill.register(PlaceholderBlot, true);
 
   const calculateDropIndex = (mousePosition) => {
     const editor = quillRef.current.getEditor();
@@ -111,10 +118,16 @@ const AdvancedTextInput = () => {
             y: clientOffset.y - editorBounds.top,
           };
 
-          const closestIndex = calculateDropIndex(mousePosition);
+          let closestIndex = calculateDropIndex(mousePosition);
 
           // Set the selection to the index we've found
           quill.setSelection(closestIndex, 0, "silent");
+
+          // Check and add space before the placeholder if necessary
+          if (closestIndex > 0 && quill.getText(closestIndex - 1, 1) !== " ") {
+            quill.insertText(closestIndex, " ", Quill.sources.USER);
+            closestIndex += 1; // Adjust the index for the newly added space
+          }
 
           // Perform the insertEmbed at the new calculated position
           quill.insertEmbed(
@@ -124,12 +137,16 @@ const AdvancedTextInput = () => {
             Quill.sources.USER,
           );
 
+          // Adjust index after insertion for potential space addition
+          closestIndex += 1;
+
+          // Check and add space after the placeholder if necessary
+          if (quill.getText(closestIndex, 1) !== " ") {
+            quill.insertText(closestIndex, " ", Quill.sources.USER);
+          }
+
           // Update the selection to just after the inserted text
-          quill.setSelection(
-            closestIndex + item.name.length,
-            0,
-            Quill.sources.SILENT,
-          );
+          quill.setSelection(closestIndex + 1, 0, Quill.sources.SILENT);
         }
       }
     },
@@ -146,9 +163,40 @@ const AdvancedTextInput = () => {
     setText(editor.getHTML()); // or content for just the HTML content
   };
 
+  const intermediateDropHandler = (event) => {
+    // Log for debugging purposes
+
+    // Check if the Quill editor reference exists
+    if (!quillRef.current) {
+      return;
+    }
+
+    // Retrieve the id of the dragged item
+    const draggedId = event.dataTransfer.getData("text/id");
+
+    // Check if the id of the dragged item is 'from_editor'
+    if (draggedId === "from_editor") {
+      // Retrieve the placeholder data from the dragged item
+      const item = { name: event.dataTransfer.getData("text/plain") };
+      const clientOffset = { x: event.clientX, y: event.clientY };
+      const monitor = {
+        getClientOffset: () => clientOffset,
+      };
+
+      // If the dragged item is from 'from_editor', handle the drop
+      handleDrop(item, monitor);
+    } else {
+      // Optionally, handle the case where the dragged item is not from 'from_editor'
+    }
+  };
+
   return (
     <div
       ref={drop}
+      onDragOver={(e) => {
+        e.preventDefault();
+      }}
+      onDrop={intermediateDropHandler}
       style={{
         border: "1px solid black",
         width: "100%",

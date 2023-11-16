@@ -2,7 +2,7 @@ import React from "react";
 import { useDrag } from "react-dnd";
 import { Paper, Typography, Box } from "@mui/material";
 
-const Placeholder = ({ name }) => {
+export const Placeholder = ({ name }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: "PLACEHOLDER",
     item: { name },
