@@ -45,6 +45,8 @@ INSTALLED_APPS = [
    'community',
    'metadata',
    'prompt_templates',
+    # Third party
+    'rest_framework',
 ]
 
 MIDDLEWARE = [

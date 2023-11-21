@@ -24,6 +24,7 @@ class Template(models.Model):
     )
     date_created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
+    parts = models.ManyToManyField('TemplatePart', related_name='templates', blank=True)
 
     def __str__(self):
         return self.name
@@ -43,9 +44,6 @@ class TemplatePart(models.Model):
         # Add more types as needed
     ]
 
-    template = models.ForeignKey(
-        Template, related_name="parts", on_delete=models.CASCADE
-    )
     content = models.TextField()
     order = models.PositiveIntegerField()
     type = models.CharField(max_length=10, choices=TYPE_CHOICES, default=BODY)
@@ -54,6 +52,5 @@ class TemplatePart(models.Model):
         ordering = ["order"]
 
     def __str__(self):
-        return f"{self.type} - {self.template.name}"
-
+        return f"{self.type} - {self.order}"
 
